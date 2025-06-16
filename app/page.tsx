@@ -12,12 +12,10 @@ import { Menu, FileText, Plus, Gamepad2, X, ArrowLeftIcon } from "lucide-react";
 import Sidebar from "./components/Sidebar";
 import { motion, AnimatePresence } from "framer-motion";
 
-interface HomeProps {
-  theme?: "light" | "dark";
-  setTheme?: (theme: "light" | "dark") => void;
-}
+// Remove the interface since Next.js pages don't accept props by default
+// If you need theme management, consider using a context or state management solution
 
-function Home({ theme = "dark", setTheme = () => {} }: HomeProps) {
+function Home() {
   const { user, signIn, signOut, signUp } = useAuth();
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
@@ -25,15 +23,16 @@ function Home({ theme = "dark", setTheme = () => {} }: HomeProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
-  const [setNoteError] = useState<string | null>(null);
+  const [noteError, setNoteError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"notes" | "profile">("notes");
-  const [setShareUrl] = useState<string | null>(null);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [fullName, setFullName] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
-  const [setEditorOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">("dark");
 
   const fetchNotes = useCallback(async () => {
     if (!user) return;
@@ -56,7 +55,7 @@ function Home({ theme = "dark", setTheme = () => {} }: HomeProps) {
         setNoteError("An unexpected error occurred. Please try again.");
       }
     }
-  }, [user]);
+  }, [user, setNoteError]); // Fixed: Added setNoteError to dependencies
 
   useEffect(() => {
     if (user) {
@@ -506,6 +505,16 @@ function Home({ theme = "dark", setTheme = () => {} }: HomeProps) {
           </motion.div>
         )}
 
+        {/* Display noteError if it exists */}
+        {noteError && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+            <p className="text-red-400 text-sm">{noteError}</p>
+          </motion.div>
+        )}
+
         {/* Notes grid or editor */}
         {activeTab === "notes" && !showEditor && (
           <motion.div
@@ -576,7 +585,7 @@ function Home({ theme = "dark", setTheme = () => {} }: HomeProps) {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleCloseEditor}
-                className="mb-6 px-4 py-2  bg-zinc-800 text-white rounded-lg border border-zinc-700 hover:bg-zinc-700 transition-all">
+                className="flex items-center gap-2 mb-6 px-4 py-2 bg-zinc-800 text-white rounded-lg border border-zinc-700 hover:bg-zinc-700 transition-all">
                 <ArrowLeftIcon className="h-4 w-4" /> Back
               </motion.button>
               <NoteEditor

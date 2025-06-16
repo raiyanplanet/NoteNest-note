@@ -6,7 +6,6 @@ import { ThemeProvider } from "./context/ThemeContext";
 // import ThemeSwitcher from "./components/ThemeSwitcher";
 import { Toaster } from "react-hot-toast";
 import "@radix-ui/themes/styles.css";
-import ClientLayout from "./components/ClientLayout";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,7 +21,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.className} bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-zinc-100 transition-colors duration-300`}>
+      <body
+        className={`${inter.className} bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-zinc-100 transition-colors duration-300`}>
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -42,17 +42,16 @@ export default function RootLayout({
             `,
           }}
         />
-        <ClientLayout>
-          <ThemeProvider>
-            <AuthProvider>
-              {/* <div className="fixed top-4 right-4 z-50">
+
+        <ThemeProvider>
+          <AuthProvider>
+            {/* <div className="fixed top-4 right-4 z-50">
                 <ThemeSwitcher />
               </div> */}
-              {children}
-              <Toaster position="top-right" />
-            </AuthProvider>
-          </ThemeProvider>
-        </ClientLayout>
+            {children}
+            <Toaster position="top-right" />
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

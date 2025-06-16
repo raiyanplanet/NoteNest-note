@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
+import toast from "react-hot-toast";
 import {
   Edit3,
   Save,
@@ -58,16 +59,19 @@ export default function Profile() {
           email: newEmail,
         });
         if (emailError) throw emailError;
+        toast.success("Email updated successfully");
       }
       if (newPassword) {
         if (newPassword !== confirmPassword) {
           setError("Passwords do not match");
+          toast.error("Passwords do not match");
           return;
         }
         const { error: passwordError } = await supabase.auth.updateUser({
           password: newPassword,
         });
         if (passwordError) throw passwordError;
+        toast.success("Password updated successfully");
       }
       const { error: profileError } = await supabase
         .from("profiles")
@@ -77,12 +81,16 @@ export default function Profile() {
           date_of_birth: dateOfBirth || null,
         });
       if (profileError) throw profileError;
+      toast.success("Profile updated successfully");
       setSuccess("Profile updated successfully");
       setIsEditing(false);
       setNewPassword("");
       setConfirmPassword("");
     } catch (error: unknown) {
-      if (error instanceof Error) setError(error.message);
+      if (error instanceof Error) {
+        setError(error.message);
+        toast.error(error.message);
+      }
     }
   };
 
@@ -104,9 +112,13 @@ export default function Profile() {
         user?.id || ""
       );
       if (deleteError) throw deleteError;
+      toast.success("Account deleted successfully");
       await signOut();
     } catch (error: unknown) {
-      if (error instanceof Error) setError(error.message);
+      if (error instanceof Error) {
+        setError(error.message);
+        toast.error(error.message);
+      }
     }
   };
 

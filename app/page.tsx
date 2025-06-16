@@ -6,33 +6,34 @@ import type { Note } from "./lib/supabase";
 import { useAuth } from "./context/AuthContext";
 import Profile from "./components/Profile";
 import NoteEditor from "./components/NoteEditor";
-import NoteList from "./components/NoteList";
-import {
-  Menu,
-  User,
-  FileText,
-  LogOut,
-  Plus,
-  Gamepad2,
-} from "lucide-react";
 
-export default function Home() {
-  const { user, signIn, signOut } = useAuth();
+import toast from "react-hot-toast";
+import { Menu, FileText, Plus, Gamepad2, X, ArrowLeftIcon } from "lucide-react";
+import Sidebar from "./components/Sidebar";
+import { motion, AnimatePresence } from "framer-motion";
+
+interface HomeProps {
+  theme?: "light" | "dark";
+  setTheme?: (theme: "light" | "dark") => void;
+}
+
+function Home({ theme = "dark", setTheme = () => {} }: HomeProps) {
+  const { user, signIn, signOut, signUp } = useAuth();
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
-  const [noteError, setNoteError] = useState<string | null>(null);
+  const [setNoteError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"notes" | "profile">("notes");
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [setShareUrl] = useState<string | null>(null);
   const [fullName, setFullName] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [editorOpen, setEditorOpen] = useState(false);
+  const [setEditorOpen] = useState(false);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showEditor, setShowEditor] = useState(false);
 
   const fetchNotes = useCallback(async () => {
     if (!user) return;
@@ -65,7 +66,12 @@ export default function Home() {
 
   useEffect(() => {
     const checkScreen = () => {
-      setIsLargeScreen(window.innerWidth >= 1024); // lg breakpoint
+      const isLarge = window.innerWidth >= 768; // md breakpoint
+      setIsLargeScreen(isLarge);
+      // Close mobile menu when screen becomes large
+      if (isLarge) {
+        setMobileMenuOpen(false);
+      }
     };
     checkScreen();
     window.addEventListener("resize", checkScreen);
@@ -79,14 +85,13 @@ export default function Home() {
       if (isLogin) {
         await signIn(email, password);
       } else {
-        const { data, error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        if (data.user) {
+        await signUp(email, password);
+        if (user) {
           const { error: profileError } = await supabase
             .from("profiles")
             .insert([
               {
-                id: data.user.id,
+                id: user.id,
                 full_name: fullName,
                 date_of_birth: dateOfBirth,
               },
@@ -99,13 +104,12 @@ export default function Home() {
     }
   };
 
-  const handleSaveNote = async (
-    title: string,
-    content: string
-  ) => {
+  // Update the handleSaveNote function to handle creating new notes:
+  const handleSaveNote = async (title: string, content: string) => {
     if (!user) return;
     try {
       if (selectedNote) {
+        // Update existing note
         const { error } = await supabase
           .from("notes")
           .update({
@@ -119,24 +123,26 @@ export default function Home() {
           console.error("Error updating note:", error);
           throw error;
         }
+        toast.success("Note updated successfully!");
       } else {
-        const { error } = await supabase
-          .from("notes")
-          .insert([
-            {
-              title,
-              content,
-              user_id: user.id,
-            },
-          ]);
+        // Create new note
+        const { error } = await supabase.from("notes").insert([
+          {
+            title: title || "Untitled Note", // Use provided title or default
+            content,
+            user_id: user.id,
+          },
+        ]);
         if (error) {
           console.error("Error creating note:", error);
           throw error;
         }
+        toast.success("Note created successfully!");
       }
       await fetchNotes();
       setSelectedNote(null);
       if (!isLargeScreen) setEditorOpen(false);
+      setShowEditor(false); // Close editor after saving
     } catch (error: unknown) {
       if (error instanceof Error) {
         setNoteError(error.message || "Failed to save note. Please try again.");
@@ -156,7 +162,8 @@ export default function Home() {
       fetchNotes();
       setSelectedNote(null);
     } catch (error: unknown) {
-      if (error instanceof Error) setNoteError("Failed to delete note. Please try again.");
+      if (error instanceof Error)
+        setNoteError("Failed to delete note. Please try again.");
     }
   };
 
@@ -167,76 +174,127 @@ export default function Home() {
     navigator.clipboard.writeText(url);
   };
 
-  const handleCreateNote = async () => {
-    if (!user) return;
-    try {
-      const { error } = await supabase
-        .from("notes")
-        .insert([
-          {
-            title: "Untitled Note",
-            content: "",
-            user_id: user.id,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ]);
-      if (error) throw error;
-      await fetchNotes();
-      setSelectedNote(null);
-      setActiveTab("notes");
-      setEditorOpen(true);
-    } catch (error: unknown) {
-      if (error instanceof Error) setNoteError("Failed to create new note. Please try again.");
-    }
+  // Replace the handleCreateNote function with this simpler version:
+  const handleCreateNote = () => {
+    setSelectedNote(null); // Clear any selected note to create a new one
+    setActiveTab("notes");
+    setShowEditor(true);
+    // Don't create the note in database yet - wait for save
   };
 
   const handleSelectNote = (note: Note | null) => {
     setSelectedNote(note);
-    setEditorOpen(true); // Open editor on small/medium screens
+    setShowEditor(true);
+  };
+
+  const handleCloseEditor = () => {
+    setShowEditor(false);
+    setSelectedNote(null);
+  };
+
+  const toggleMobileMenu = () => {
+    setMobileMenuOpen(!mobileMenuOpen);
   };
 
   // Filter notes based on search query
-  const filteredNotes = notes.filter(
-    (note) =>
-      note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      note.content.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   if (!user) {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-slate-900 flex items-center justify-center p-4">
+      <motion.main
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-slate-900 flex items-center justify-center p-4">
         {/* Animated background elements */}
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl animate-pulse delay-500"></div>
+          <motion.div
+            animate={{
+              scale: [1, 1.1, 1],
+              rotate: [0, 10, 0],
+            }}
+            transition={{
+              duration: 8,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl"
+          />
+          <motion.div
+            animate={{
+              scale: [1, 1.2, 1],
+              rotate: [0, -15, 0],
+            }}
+            transition={{
+              duration: 10,
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: 1,
+            }}
+            className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl"
+          />
+          <motion.div
+            animate={{
+              scale: [1, 1.15, 1],
+              rotate: [0, 20, 0],
+            }}
+            transition={{
+              duration: 12,
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: 0.5,
+            }}
+            className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl"
+          />
         </div>
 
-        <div className="relative w-full max-w-md">
+        <motion.div
+          initial={{ y: 50, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="relative w-full max-w-md">
           <div className="backdrop-blur-xl bg-gradient-to-br from-zinc-900/90 to-zinc-800/80 border border-zinc-700/50 rounded-2xl shadow-2xl overflow-hidden">
             {/* Header with gradient */}
             <div className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 p-6 border-b border-zinc-700/50">
               <div className="text-center">
-                <div className="flex justify-center mb-4">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ duration: 0.5, delay: 0.4 }}
+                  className="flex justify-center mb-4">
                   <div className="p-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full">
                     <Gamepad2 className="h-8 w-8 text-white" />
                   </div>
-                </div>
-                <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                </motion.div>
+                <motion.h2
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ duration: 0.5, delay: 0.6 }}
+                  className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
                   Notenest
-                </h2>
-                <p className="mt-2 text-zinc-400">
+                </motion.h2>
+                <motion.p
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ duration: 0.5, delay: 0.8 }}
+                  className="mt-2 text-zinc-400">
                   {isLogin ? "Sign in to your account" : "Create a new account"}
-                </p>
+                </motion.p>
               </div>
             </div>
 
-            <div className="p-6">
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.5, delay: 1 }}
+              className="p-6">
               <form onSubmit={handleAuth} className="space-y-6">
                 <div className="space-y-4">
                   {!isLogin && (
-                    <>
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      transition={{ duration: 0.3 }}
+                      className="space-y-4">
                       <div>
                         <label
                           htmlFor="fullName"
@@ -268,7 +326,7 @@ export default function Home() {
                           className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 text-white transition-all duration-200"
                         />
                       </div>
-                    </>
+                    </motion.div>
                   )}
                   <div>
                     <label
@@ -304,20 +362,29 @@ export default function Home() {
                   </div>
                 </div>
 
-                {authError && (
-                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-                    <p className="text-red-400 text-sm">{authError}</p>
-                  </div>
-                )}
+                <AnimatePresence>
+                  {authError && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+                      <p className="text-red-400 text-sm">{authError}</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   type="submit"
-                  className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium rounded-lg transition-all duration-200 transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-blue-500/50 shadow-lg">
+                  className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 shadow-lg">
                   {isLogin ? "Sign in" : "Sign up"}
-                </button>
+                </motion.button>
 
                 <div className="text-center">
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
                     type="button"
                     onClick={() => {
                       setIsLogin(!isLogin);
@@ -327,207 +394,217 @@ export default function Home() {
                     {isLogin
                       ? "Need an account? Sign up"
                       : "Already have an account? Sign in"}
-                  </button>
+                  </motion.button>
                 </div>
               </form>
-            </div>
+            </motion.div>
           </div>
-        </div>
-      </main>
+        </motion.div>
+      </motion.main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-slate-900 flex flex-col">
-      {/* Animated background elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/5 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500/5 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-1/3 left-1/3 w-96 h-96 bg-cyan-500/3 rounded-full blur-3xl animate-pulse delay-500"></div>
-      </div>
+    <div className="flex h-screen bg-zinc-950 relative">
+      {/* Mobile Menu Button */}
+      {!isLargeScreen && (
+        <motion.button
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          onClick={toggleMobileMenu}
+          className="fixed top-4 left-4 z-50 p-3 bg-zinc-800 text-white rounded-lg shadow-lg border border-zinc-700 hover:bg-zinc-700 transition-colors">
+          <AnimatePresence mode="wait">
+            {mobileMenuOpen ? (
+              <motion.div
+                key="close"
+                initial={{ rotate: -90, opacity: 0 }}
+                animate={{ rotate: 0, opacity: 1 }}
+                exit={{ rotate: 90, opacity: 0 }}
+                transition={{ duration: 0.2 }}>
+                <X className="h-6 w-6" />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="menu"
+                initial={{ rotate: 90, opacity: 0 }}
+                animate={{ rotate: 0, opacity: 1 }}
+                exit={{ rotate: -90, opacity: 0 }}
+                transition={{ duration: 0.2 }}>
+                <Menu className="h-6 w-6" />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.button>
+      )}
 
-      {/* Sticky Header */}
-      <nav className="sticky top-0 z-50 backdrop-blur-xl bg-zinc-900/80 border-b border-zinc-800/50 shadow-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg md:block hidden">
-                <Gamepad2 className="h-6 w-6 text-white" />
-              </div>
-              {/* Hamburger for mobile */}
-              <button
-                className="md:hidden focus:outline-none"
-                onClick={() => setMobileMenuOpen(true)}
-                aria-label="Open menu">
-                <Menu className="h-6 w-6 text-zinc-400" />
-              </button>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent flex items-center gap-2">
-                Notenest
-              </h1>
-            </div>
-            <button
-              onClick={signOut}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg text-zinc-300 hover:text-white bg-zinc-800/50 hover:bg-zinc-700/50 border border-zinc-700/50 transition-all duration-200">
-              <LogOut className="h-4 w-4" /> Sign out
-            </button>
-          </div>
-        </div>
-        {/* Mobile Menu Overlay */}
-        {mobileMenuOpen && (
-          <div className="fixed inset-0 z-50 bg-black/60 flex items-start justify-end md:hidden">
-            <div className="w-64 bg-zinc-900 h-full shadow-xl flex flex-col p-6">
-              <button
-                className="self-end mb-6 text-zinc-400 hover:text-white"
-                onClick={() => setMobileMenuOpen(false)}
-                aria-label="Close menu">
-                <span className="text-2xl">×</span>
-              </button>
-              <button
-                className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-zinc-800 mb-2 font-medium"
-                onClick={() => {
-                  setActiveTab("notes");
-                  setMobileMenuOpen(false);
-                }}>
-                Home
-              </button>
-              <button
-                className="w-full text-left px-4 py-3 rounded-lg text-white hover:bg-zinc-800 mb-2 font-medium"
-                onClick={() => {
-                  setActiveTab("profile");
-                  setEditorOpen(false);
-                  setMobileMenuOpen(false);
-                }}>
-                Profile
-              </button>
-              <button
-                className="w-full text-left px-4 py-3 rounded-lg text-red-400 hover:bg-red-500/20 font-medium"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  signOut();
-                }}>
-                Logout
-              </button>
-            </div>
-          </div>
+      {/* Mobile Overlay */}
+      <AnimatePresence>
+        {!isLargeScreen && mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setMobileMenuOpen(false)}
+            className="fixed inset-0 bg-black/50 z-40"
+          />
         )}
-      </nav>
+      </AnimatePresence>
 
-      <div className="flex-1 flex flex-col lg:flex-row max-w-7xl mx-auto w-full p-4 lg:p-6 gap-6 relative">
-        {/* Sidebar/Note List */}
-        {(isLargeScreen || !editorOpen) && activeTab === "notes" && (
-          <aside className="w-full lg:w-80 xl:w-96">
-            <div className="backdrop-blur-xl bg-gradient-to-br from-zinc-900/90 to-zinc-800/80 border border-zinc-700/50 rounded-2xl shadow-2xl overflow-hidden h-full flex flex-col">
-              {/* Sidebar Header */}
-              <div className="bg-gradient-to-r from-blue-600/10 to-purple-600/10 p-4 border-b border-zinc-700/50">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-blue-400" />
-                    Your Notes
-                  </h2>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      placeholder="Search notes..."
-                      className="px-3 py-2 bg-zinc-800/50 border border-zinc-700/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 text-white placeholder-zinc-500 transition-all duration-200 w-36"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                    <button
-                      onClick={handleCreateNote}
-                      className="inline-flex items-center px-3 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-sm font-medium rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg">
-                      <Plus className="h-4 w-4 mr-1" /> New
-                    </button>
-                  </div>
-                </div>
-              </div>
-              {/* Notes List */}
-              <div className="flex-1 overflow-y-auto p-4">
-                <NoteList
-                  notes={filteredNotes}
-                  onSelectNote={handleSelectNote}
-                  onCreateNote={handleCreateNote}
-                />
-              </div>
-            </div>
-          </aside>
+      {/* Sidebar */}
+      <AnimatePresence>
+        {(isLargeScreen || mobileMenuOpen) && (
+          <motion.div
+            initial={isLargeScreen ? false : { x: -280 }}
+            animate={{ x: 0 }}
+            exit={{ x: -280 }}
+            transition={{
+              type: "spring",
+              damping: 25,
+              stiffness: 200,
+              duration: 0.3,
+            }}
+            className={`${isLargeScreen ? "relative" : "fixed"} z-50 h-full`}>
+            <Sidebar
+              activeTab={activeTab}
+              setActiveTab={(tab) => {
+                setActiveTab(tab);
+                if (!isLargeScreen) setMobileMenuOpen(false);
+              }}
+              onLogout={signOut}
+              theme={theme}
+              setTheme={setTheme}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Main content area */}
+      <motion.main
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        className={`flex-1 p-4 md:p-8 overflow-y-auto ${
+          !isLargeScreen ? "pt-20" : "ml-20"
+        }`}>
+        {/* Top bar with + New button (only on notes tab and when not editing) */}
+        {activeTab === "notes" && !showEditor && (
+          <motion.div
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.4 }}
+            className="flex justify-between items-center mb-8">
+            <h1 className="text-xl md:text-2xl font-bold text-zinc-100">
+              Your Notes
+            </h1>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleCreateNote}
+              className="flex items-center gap-2 px-4 md:px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow transition-all">
+              <Plus className="h-4 w-4 md:h-5 md:w-5" /> New
+            </motion.button>
+          </motion.div>
         )}
 
-        {/* Main Content */}
-        {(isLargeScreen || editorOpen || activeTab === "profile") && (
-          <section className="flex-1 flex flex-col gap-6">
-            {/* Tab Navigation */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setActiveTab("notes")}
-                className={`flex items-center px-6 py-3 text-sm font-medium rounded-xl transition-all duration-200 gap-2 ${
-                  activeTab === "notes"
-                    ? "bg-gradient-to-r from-blue-600/20 to-purple-600/20 text-blue-400 border border-blue-500/30 shadow-lg"
-                    : "text-zinc-400 hover:text-white bg-zinc-800/30 hover:bg-zinc-700/50 border border-zinc-700/30"
-                }`}>
-                <FileText className="h-4 w-4" /> Notes
-              </button>
-              <button
-                onClick={() => setActiveTab("profile")}
-                className={`flex items-center px-6 py-3 text-sm font-medium rounded-xl transition-all duration-200 gap-2 ${
-                  activeTab === "profile"
-                    ? "bg-gradient-to-r from-blue-600/20 to-purple-600/20 text-blue-400 border border-blue-500/30 shadow-lg"
-                    : "text-zinc-400 hover:text-white bg-zinc-800/30 hover:bg-zinc-700/50 border border-zinc-700/30"
-                }`}>
-                <User className="h-4 w-4" /> Profile
-              </button>
-            </div>
-
-            {/* Main Content Area */}
-            <div className="backdrop-blur-xl bg-gradient-to-br from-zinc-900/90 to-zinc-800/80 border border-zinc-700/50 rounded-2xl shadow-2xl overflow-hidden flex-1 min-h-[500px] flex flex-col">
-              <div className="p-6 flex-1">
-                {/* Status Messages */}
-                {shareUrl && (
-                  <div className="mx-6 mb-6 p-4 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-lg">
-                    <p className="text-sm text-green-400">
-                      📋 Note link copied to clipboard: {shareUrl}
-                    </p>
-                  </div>
-                )}
-
-                {noteError && (
-                  <div className="mx-6 mb-6 p-4 bg-gradient-to-r from-red-500/10 to-pink-500/10 border border-red-500/20 rounded-lg">
-                    <p className="text-sm text-red-400">⚠️ {noteError}</p>
-                  </div>
-                )}
-                {activeTab === "notes" ? (
-                  // Responsive: Only show editor if open on small/medium, always on large
-
-                  isLargeScreen || editorOpen ? (
-                    <div>
-                      {/* Back button for small/medium screens */}
-                      {!isLargeScreen && (
-                        <button
-                          onClick={() => setEditorOpen(false)}
-                          className="mb-4 px-4 py-2 bg-zinc-800 text-white rounded-lg border border-zinc-700 hover:bg-zinc-700 transition-all">
-                          ← Back to Notes
-                        </button>
+        {/* Notes grid or editor */}
+        {activeTab === "notes" && !showEditor && (
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+            <AnimatePresence>
+              {notes.length === 0 ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="col-span-full text-center text-zinc-400">
+                  No notes yet.
+                </motion.div>
+              ) : (
+                notes.map((note, index) => (
+                  <motion.button
+                    key={note.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{
+                      duration: 0.3,
+                      delay: index * 0.1,
+                    }}
+                    whileHover={{
+                      scale: 1.02,
+                      transition: { duration: 0.2 },
+                    }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleSelectNote(note)}
+                    className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 md:p-5 text-left shadow hover:shadow-lg hover:border-blue-500 transition-all group">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileText className="h-4 w-4 md:h-5 md:w-5 text-blue-400" />
+                      <span className="text-base md:text-lg font-semibold text-zinc-100 group-hover:text-blue-400 transition-all">
+                        {note.title || "Untitled"}
+                      </span>
+                    </div>
+                    <div className="text-zinc-400 text-sm line-clamp-3 mb-2">
+                      {note.content || "No content"}
+                    </div>
+                    <div className="text-xs text-zinc-500 flex items-center gap-2">
+                      {new Date(note.updated_at).toLocaleDateString()}
+                      {note.is_public && (
+                        <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs">
+                          Public
+                        </span>
                       )}
-                      <NoteEditor
-                        note={selectedNote}
-                        onSave={handleSaveNote}
-                        onDelete={handleDeleteNote}
-                        onShare={handleShareNote}
-                      />
                     </div>
-                  ) : (
-                    // Show nothing or a placeholder on small/medium if editor not open
-                    <div className="text-zinc-400 text-center mt-20">
-                      Select or create a note to get started.
-                    </div>
-                  )
-                ) : (
-                  <Profile />
-                )}
-              </div>
-            </div>
-          </section>
+                  </motion.button>
+                ))
+              )}
+            </AnimatePresence>
+          </motion.div>
         )}
-      </div>
-    </main>
+
+        {/* Note editor (full width) */}
+        <AnimatePresence>
+          {activeTab === "notes" && showEditor && (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+              className="max-w-2xl mx-auto">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleCloseEditor}
+                className="mb-6 px-4 py-2  bg-zinc-800 text-white rounded-lg border border-zinc-700 hover:bg-zinc-700 transition-all">
+                <ArrowLeftIcon className="h-4 w-4" /> Back
+              </motion.button>
+              <NoteEditor
+                note={selectedNote}
+                onSave={handleSaveNote}
+                onDelete={handleDeleteNote}
+                onShare={handleShareNote}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Profile tab */}
+        <AnimatePresence>
+          {activeTab === "profile" && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="max-w-2xl mx-auto">
+              <Profile />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.main>
+    </div>
   );
 }
+
+export default Home;

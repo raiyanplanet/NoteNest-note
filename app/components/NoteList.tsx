@@ -4,6 +4,8 @@ import { useState } from "react";
 import type { Note } from "../lib/supabase";
 import { DocumentTextIcon } from "@heroicons/react/24/outline";
 
+import toast from "react-hot-toast";
+
 interface NoteListProps {
   notes: Note[];
   onSelectNote: (note: Note | null) => void;
@@ -23,6 +25,26 @@ export default function NoteList({
       note.content.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const handleCreateNote = async () => {
+    try {
+      await onCreateNote();
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        toast.error(error.message || "Failed to create new note");
+      }
+    }
+  };
+
+  const handleSelectNote = (note: Note | null) => {
+    try {
+      onSelectNote(note);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        toast.error(error.message || "Failed to select note");
+      }
+    }
+  };
+
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-lg shadow">
       <div className="p-4 border-b border-gray-200 dark:border-zinc-700">
@@ -38,9 +60,8 @@ export default function NoteList({
             className="flex-1 px-3 py-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-gray-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button
-            onClick={onCreateNote}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          >
+            onClick={handleCreateNote}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
             New Note
           </button>
         </div>
@@ -54,7 +75,7 @@ export default function NoteList({
           filteredNotes.map((note) => (
             <button
               key={note.id}
-              onClick={() => onSelectNote(note)}
+              onClick={() => handleSelectNote(note)}
               className="w-full p-4 text-left hover:bg-gray-50 dark:hover:bg-zinc-800 focus:outline-none focus:bg-gray-50 dark:focus:bg-zinc-800">
               <div className="flex items-start">
                 <DocumentTextIcon className="h-5 w-5 text-gray-400 dark:text-zinc-500 mt-1 mr-3" />

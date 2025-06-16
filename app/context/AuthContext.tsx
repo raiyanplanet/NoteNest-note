@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { User } from '@supabase/supabase-js';
+import toast from 'react-hot-toast';
 
 type AuthContextType = {
   user: User | null;
@@ -53,13 +54,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (email: string, password: string) => {
     try {
       setError(null);
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
       });
       if (error) throw error;
+      if (data.user) {
+        toast.success("Confirmation email sent! Please check your inbox.");
+      }
     } catch (error: unknown) {
-      if (error instanceof Error) setError(error.message);
+      if (error instanceof Error) {
+        setError(error.message);
+        toast.error(error.message);
+      }
       throw error;
     }
   };

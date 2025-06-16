@@ -3,7 +3,10 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
-import ThemeSwitcher from "./components/ThemeSwitcher";
+// import ThemeSwitcher from "./components/ThemeSwitcher";
+import { Toaster } from "react-hot-toast";
+import "@radix-ui/themes/styles.css";
+import ClientLayout from "./components/ClientLayout";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -39,14 +42,17 @@ export default function RootLayout({
             `,
           }}
         />
-        <ThemeProvider>
-          <AuthProvider>
-            <div className="fixed top-4 right-4 z-50">
-              <ThemeSwitcher />
-            </div>
-            {children}
-          </AuthProvider>
-        </ThemeProvider>
+        <ClientLayout>
+          <ThemeProvider>
+            <AuthProvider>
+              {/* <div className="fixed top-4 right-4 z-50">
+                <ThemeSwitcher />
+              </div> */}
+              {children}
+              <Toaster position="top-right" />
+            </AuthProvider>
+          </ThemeProvider>
+        </ClientLayout>
       </body>
     </html>
   );

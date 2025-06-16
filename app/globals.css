@@ -24,3 +24,28 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Ensure form and input fields are visible in dark mode */
+input, textarea, select {
+  @apply bg-white text-gray-900 border-gray-300 dark:bg-zinc-900 dark:text-zinc-100 dark:border-zinc-700;
+}
+
+label {
+  @apply text-gray-700 dark:text-zinc-200;
+}
+
+/* Table headers and cells */
+th, td {
+  @apply bg-white text-gray-900 dark:bg-zinc-900 dark:text-zinc-100;
+}
+
+/* For table borders */
+table, th, td {
+  @apply border-gray-200 dark:border-zinc-700;
+}
+
+/* For error and success messages */
+.bg-red-50 { @apply dark:bg-zinc-900; }
+.bg-green-50 { @apply dark:bg-zinc-900; }
+.text-red-600 { @apply dark:text-red-400; }
+.text-green-600 { @apply dark:text-green-400; }

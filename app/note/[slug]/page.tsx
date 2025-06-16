@@ -50,13 +50,15 @@ export default function SharedNote({ params }: { params: Promise<{ slug: string 
 
         console.log('Note found:', data); // Debug log
         setNote(data);
-      } catch (error: any) {
-        console.error('Error fetching note:', {
-          name: error.name,
-          message: error.message,
-          stack: error.stack
-        });
-        setError(error.message || 'Failed to load note');
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          console.error('Error fetching note:', {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+          });
+          setError(error.message || 'Failed to load note');
+        }
       } finally {
         setLoading(false);
       }
@@ -88,7 +90,7 @@ export default function SharedNote({ params }: { params: Promise<{ slug: string 
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
           <p className="text-gray-600">{error}</p>
           <p className="mt-4 text-sm text-gray-500">
-            The note you're looking for might not exist.
+            The note you&apos;re looking for might not exist.
           </p>
         </div>
       </div>

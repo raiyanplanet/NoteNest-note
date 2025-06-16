@@ -48,11 +48,10 @@ export default function Profile() {
     fetchProfile();
   }, [user]);
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
+  const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
-
     try {
       if (newEmail !== user?.email) {
         const { error: emailError } = await supabase.auth.updateUser({
@@ -60,7 +59,6 @@ export default function Profile() {
         });
         if (emailError) throw emailError;
       }
-
       if (newPassword) {
         if (newPassword !== confirmPassword) {
           setError("Passwords do not match");
@@ -71,7 +69,6 @@ export default function Profile() {
         });
         if (passwordError) throw passwordError;
       }
-
       const { error: profileError } = await supabase
         .from("profiles")
         .upsert({
@@ -80,13 +77,12 @@ export default function Profile() {
           date_of_birth: dateOfBirth || null,
         });
       if (profileError) throw profileError;
-
       setSuccess("Profile updated successfully");
       setIsEditing(false);
       setNewPassword("");
       setConfirmPassword("");
-    } catch (error: any) {
-      setError(error.message);
+    } catch (error: unknown) {
+      if (error instanceof Error) setError(error.message);
     }
   };
 
@@ -98,26 +94,19 @@ export default function Profile() {
     ) {
       return;
     }
-
     try {
-      // First delete all user's notes
       const { error: notesError } = await supabase
         .from("notes")
         .delete()
         .eq("user_id", user?.id);
-
       if (notesError) throw notesError;
-
-      // Then delete the user account
       const { error: deleteError } = await supabase.auth.admin.deleteUser(
         user?.id || ""
       );
-
       if (deleteError) throw deleteError;
-
       await signOut();
-    } catch (error: any) {
-      setError(error.message);
+    } catch (error: unknown) {
+      if (error instanceof Error) setError(error.message);
     }
   };
 

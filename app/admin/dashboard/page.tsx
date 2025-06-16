@@ -1,9 +1,8 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/app/lib/supabase';
-import type { Note } from '@/app/lib/supabase';
+import { useEffect, useState } from "react";
+import { supabase } from "@/app/lib/supabase";
+import type { Note } from "@/app/lib/supabase";
 
 type User = {
   id: string;
@@ -18,7 +17,6 @@ export default function AdminDashboard() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
     checkAdmin();
@@ -26,113 +24,119 @@ export default function AdminDashboard() {
   }, []);
 
   const checkAdmin = () => {
-    console.log('Checking admin status...');
+    console.log("Checking admin status...");
     const adminCookie = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('admin='));
-    
-    console.log('Admin cookie:', adminCookie);
+      .split("; ")
+      .find((row) => row.startsWith("admin="));
+
+    console.log("Admin cookie:", adminCookie);
 
     if (!adminCookie) {
-      console.log('No admin cookie found, redirecting to login');
-      window.location.href = '/admin/login';
+      console.log("No admin cookie found, redirecting to login");
+      window.location.href = "/admin/login";
       return;
     }
 
     try {
-      const adminData = JSON.parse(decodeURIComponent(adminCookie.split('=')[1]));
-      console.log('Admin data:', adminData);
-      
+      const adminData = JSON.parse(
+        decodeURIComponent(adminCookie.split("=")[1])
+      );
+      console.log("Admin data:", adminData);
+
       if (!adminData.isAdmin) {
-        console.log('Not an admin, redirecting to login');
-        window.location.href = '/admin/login';
+        console.log("Not an admin, redirecting to login");
+        window.location.href = "/admin/login";
       }
     } catch (error) {
-      console.error('Error parsing admin cookie:', error);
-      window.location.href = '/admin/login';
+      console.error("Error parsing admin cookie:", error);
+      window.location.href = "/admin/login";
     }
   };
 
   const fetchData = async () => {
     try {
       // Fetch users from the API route
-      const res = await fetch('/api/admin-users');
+      const res = await fetch("/api/admin-users");
       const usersJson = await res.json();
       if (usersJson.error) throw new Error(usersJson.error);
       const usersData = usersJson.users;
       // Fetch profiles
       const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, full_name, date_of_birth');
+        .from("profiles")
+        .select("id, full_name, date_of_birth");
       if (profilesError) throw profilesError;
       // Merge user and profile data
-      const transformedUsers = usersData.map((user: any) => {
-        const profile = profiles.find((p: any) => p.id === user.id) as any || {};
+      const transformedUsers = usersData.map((user: { id: string; email: string | null; created_at: string }) => {
+        const profile = (profiles.find((p: { id: string; full_name: string | null; date_of_birth: string | null }) => p.id === user.id)) || { full_name: null, date_of_birth: null };
         return {
           id: user.id,
-          email: user.email || '',
+          email: user.email || "",
           created_at: user.created_at,
-          full_name: profile.full_name || '',
-          date_of_birth: profile.date_of_birth || '',
+          full_name: profile.full_name || "",
+          date_of_birth: profile.date_of_birth || "",
         };
       });
       setUsers(transformedUsers);
 
       // Fetch notes
       const { data: notesData, error: notesError } = await supabase
-        .from('notes')
-        .select('*');
+        .from("notes")
+        .select("*");
 
       if (notesError) {
-        console.error('Error fetching notes:', notesError);
+        console.error("Error fetching notes:", notesError);
         throw notesError;
       }
       setNotes(notesData || []);
-    } catch (error: any) {
-      setError(error.message);
+    } catch (error: unknown) {
+      if (error instanceof Error) setError(error.message);
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user? This will also delete all their notes.')) return;
+    if (
+      !confirm(
+        "Are you sure you want to delete this user? This will also delete all their notes."
+      )
+    )
+      return;
 
     try {
-      const res = await fetch('/api/delete-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/delete-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),
       });
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || 'Failed to delete user');
-      setUsers(users.filter(user => user.id !== userId));
-      setNotes(notes.filter(note => note.user_id !== userId));
-    } catch (error: any) {
-      setError(error.message);
+      if (!res.ok) throw new Error(result.error || "Failed to delete user");
+      setUsers(users.filter((user) => user.id !== userId));
+      setNotes(notes.filter((note) => note.user_id !== userId));
+    } catch (error: unknown) {
+      if (error instanceof Error) setError(error.message);
     }
   };
 
   const handleDeleteNote = async (noteId: string) => {
-    if (!confirm('Are you sure you want to delete this note?')) return;
+    if (!confirm("Are you sure you want to delete this note?")) return;
 
     try {
-      const { error } = await supabase
-        .from('notes')
-        .delete()
-        .eq('id', noteId);
+      const { error } = await supabase.from("notes").delete().eq("id", noteId);
 
       if (error) throw error;
-      setNotes(notes.filter(note => note.id !== noteId));
-    } catch (error: any) {
-      console.error('Error deleting note:', error);
-      setError(error.message);
+      setNotes(notes.filter((note) => note.id !== noteId));
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error("Error deleting note:", error.message);
+        setError(error.message);
+      }
     }
   };
 
   const handleSignOut = () => {
-    document.cookie = 'admin=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-    window.location.href = '/admin/login';
+    document.cookie = "admin=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+    window.location.href = "/admin/login";
   };
 
   if (loading) {
@@ -152,13 +156,14 @@ export default function AdminDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <h1 className="text-xl font-bold text-gray-900 dark:text-zinc-100">Admin Dashboard</h1>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-zinc-100">
+                Admin Dashboard
+              </h1>
             </div>
             <div className="flex items-center">
               <button
                 onClick={handleSignOut}
-                className="ml-4 px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
-              >
+                className="ml-4 px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">
                 Sign Out
               </button>
             </div>
@@ -176,7 +181,9 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* Users Section */}
           <div className="bg-white dark:bg-zinc-900 shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 dark:text-zinc-100 mb-4">Users ({users.length})</h2>
+            <h2 className="text-lg font-medium text-gray-900 dark:text-zinc-100 mb-4">
+              Users ({users.length})
+            </h2>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-zinc-800">
                 <thead>
@@ -216,8 +223,7 @@ export default function AdminDashboard() {
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
                           onClick={() => handleDeleteUser(user.id)}
-                          className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
-                        >
+                          className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300">
                           Delete
                         </button>
                       </td>
@@ -230,7 +236,9 @@ export default function AdminDashboard() {
 
           {/* Notes Section */}
           <div className="bg-white dark:bg-zinc-900 shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 dark:text-zinc-100 mb-4">Notes ({notes.length})</h2>
+            <h2 className="text-lg font-medium text-gray-900 dark:text-zinc-100 mb-4">
+              Notes ({notes.length})
+            </h2>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-zinc-800">
                 <thead>
@@ -253,10 +261,11 @@ export default function AdminDashboard() {
                   {notes.map((note) => (
                     <tr key={note.id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-zinc-100">
-                        {note.title || 'Untitled'}
+                        {note.title || "Untitled"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-zinc-400">
-                        {users.find(u => u.id === note.user_id)?.email || 'Unknown'}
+                        {users.find((u) => u.id === note.user_id)?.email ||
+                          "Unknown"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-zinc-400">
                         {new Date(note.created_at).toLocaleDateString()}
@@ -264,8 +273,7 @@ export default function AdminDashboard() {
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
                           onClick={() => handleDeleteNote(note.id)}
-                          className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
-                        >
+                          className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300">
                           Delete
                         </button>
                       </td>
@@ -279,4 +287,4 @@ export default function AdminDashboard() {
       </main>
     </div>
   );
-} 
+}

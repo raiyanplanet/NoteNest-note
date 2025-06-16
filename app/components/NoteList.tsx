@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import type { Note } from "../lib/supabase";
-import { PlusIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
+import { DocumentTextIcon } from "@heroicons/react/24/outline";
 
 interface NoteListProps {
   notes: Note[];
   onSelectNote: (note: Note | null) => void;
-  onCreateNote: () => void;
+  onCreateNote: () => Promise<void>;
 }
 
 export default function NoteList({
@@ -26,9 +26,24 @@ export default function NoteList({
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-lg shadow">
       <div className="p-4 border-b border-gray-200 dark:border-zinc-700">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 text-center">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 text-center mb-4">
           Notes
         </h2>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Search notes..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 px-3 py-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-gray-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            onClick={onCreateNote}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            New Note
+          </button>
+        </div>
       </div>
       <div className="divide-y divide-gray-200 dark:divide-zinc-800">
         {filteredNotes.length === 0 ? (

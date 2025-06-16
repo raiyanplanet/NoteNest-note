@@ -1,16 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/app/lib/supabase';
 import { LogIn, Mail, Lock } from 'lucide-react';
+import { supabase } from '@/app/lib/supabase';
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,9 +43,11 @@ export default function AdminLogin() {
       
       // Use window.location for a full page reload
       window.location.href = '/admin/dashboard';
-    } catch (error: any) {
-      console.error('Login error:', error);
-      setError(error.message);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error('Login error:', error);
+        setError(error.message);
+      }
     } finally {
       setLoading(false);
     }

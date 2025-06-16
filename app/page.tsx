@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "./lib/supabase";
 import type { Note } from "./lib/supabase";
-import { UserIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
 import { useAuth } from "./context/AuthContext";
 import Profile from "./components/Profile";
 import NoteEditor from "./components/NoteEditor";
@@ -14,13 +13,11 @@ import {
   FileText,
   LogOut,
   Plus,
-  Search,
   Gamepad2,
 } from "lucide-react";
-import Link from "next/link";
 
 export default function Home() {
-  const { user, signIn, signUp, signOut, error } = useAuth();
+  const { user, signIn, signOut } = useAuth();
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [isLogin, setIsLogin] = useState(true);
@@ -37,11 +34,34 @@ export default function Home() {
   const [isLargeScreen, setIsLargeScreen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const fetchNotes = useCallback(async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from("notes")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("updated_at", { ascending: false });
+      if (error) {
+        console.error("Error fetching notes:", error);
+        setNoteError("Failed to fetch notes. Please try again.");
+        return;
+      }
+      setNotes(data || []);
+      setNoteError(null);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error("Error fetching notes:", error);
+        setNoteError("An unexpected error occurred. Please try again.");
+      }
+    }
+  }, [user]);
+
   useEffect(() => {
     if (user) {
       fetchNotes();
     }
-  }, [user]);
+  }, [user, fetchNotes]);
 
   useEffect(() => {
     const checkScreen = () => {
@@ -52,41 +72,15 @@ export default function Home() {
     return () => window.removeEventListener("resize", checkScreen);
   }, []);
 
-  const fetchNotes = async () => {
-    if (!user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from("notes")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("updated_at", { ascending: false });
-
-      if (error) {
-        console.error("Error fetching notes:", error);
-        setNoteError("Failed to fetch notes. Please try again.");
-        return;
-      }
-
-      setNotes(data || []);
-      setNoteError(null);
-    } catch (error) {
-      console.error("Error fetching notes:", error);
-      setNoteError("An unexpected error occurred. Please try again.");
-    }
-  };
-
-  const handleAuth = async (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setAuthError(null);
-
     try {
       if (isLogin) {
         await signIn(email, password);
       } else {
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        // Insert profile data
         if (data.user) {
           const { error: profileError } = await supabase
             .from("profiles")
@@ -100,18 +94,16 @@ export default function Home() {
           if (profileError) throw profileError;
         }
       }
-    } catch (error: any) {
-      setAuthError(error.message);
+    } catch (error: unknown) {
+      if (error instanceof Error) setAuthError(error.message);
     }
   };
 
   const handleSaveNote = async (
     title: string,
-    content: string,
-    isPublic: boolean
+    content: string
   ) => {
     if (!user) return;
-
     try {
       if (selectedNote) {
         const { error } = await supabase
@@ -123,24 +115,12 @@ export default function Home() {
           })
           .eq("id", selectedNote.id)
           .eq("user_id", user.id);
-
         if (error) {
-          console.error("Error updating note:", {
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
-            code: error.code,
-          });
+          console.error("Error updating note:", error);
           throw error;
         }
       } else {
-        console.log("Creating new note with data:", {
-          title,
-          content,
-          user_id: user.id,
-        });
-
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from("notes")
           .insert([
             {
@@ -148,56 +128,35 @@ export default function Home() {
               content,
               user_id: user.id,
             },
-          ])
-          .select()
-          .single();
-
+          ]);
         if (error) {
-          console.error("Error creating note:", {
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
-            code: error.code,
-          });
+          console.error("Error creating note:", error);
           throw error;
         }
-
-        console.log("Note created successfully:", data);
       }
-
       await fetchNotes();
       setSelectedNote(null);
-      // Close editor on small/medium screens after save
       if (!isLargeScreen) setEditorOpen(false);
-    } catch (error: any) {
-      console.error("Error saving note:", {
-        name: error.name,
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code,
-      });
-      setNoteError(error.message || "Failed to save note. Please try again.");
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setNoteError(error.message || "Failed to save note. Please try again.");
+      }
     }
   };
 
   const handleDeleteNote = async () => {
     if (!user || !selectedNote) return;
-
     try {
       const { error } = await supabase
         .from("notes")
         .delete()
         .eq("id", selectedNote.id)
         .eq("user_id", user.id);
-
       if (error) throw error;
-
       fetchNotes();
       setSelectedNote(null);
-    } catch (error: any) {
-      console.error("Error deleting note:", error);
-      setNoteError("Failed to delete note. Please try again.");
+    } catch (error: unknown) {
+      if (error instanceof Error) setNoteError("Failed to delete note. Please try again.");
     }
   };
 
@@ -211,7 +170,7 @@ export default function Home() {
   const handleCreateNote = async () => {
     if (!user) return;
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("notes")
         .insert([
           {
@@ -221,17 +180,14 @@ export default function Home() {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           },
-        ])
-        .select()
-        .single();
+        ]);
       if (error) throw error;
-      setNotes((prevNotes) => [data, ...prevNotes]);
-      setSelectedNote(data);
+      await fetchNotes();
+      setSelectedNote(null);
       setActiveTab("notes");
-      setEditorOpen(true); // Open editor on small/medium screens
-    } catch (error: any) {
-      console.error("Error creating note:", error);
-      setNoteError("Failed to create new note. Please try again.");
+      setEditorOpen(true);
+    } catch (error: unknown) {
+      if (error instanceof Error) setNoteError("Failed to create new note. Please try again.");
     }
   };
 

@@ -25,10 +25,10 @@ function Home() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [noteError, setNoteError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"notes" | "profile">("notes");
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [, setShareUrl] = useState<string | null>(null);
   const [fullName, setFullName] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
-  const [editorOpen, setEditorOpen] = useState(false);
+  const [, setEditorOpen] = useState(false);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
